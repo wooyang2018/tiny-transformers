@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from timm.models.layers import DropPath
+from performer_pytorch import FastAttention
 
 from pycls.core.config import cfg
 
@@ -25,26 +26,44 @@ class MultiheadAttention(nn.Module):
         self.out_channels = out_channels
         self.num_heads = num_heads
 
-        self.norm_factor = qk_scale if qk_scale else (out_channels // num_heads) ** -0.5
-        self.qkv_transform = nn.Linear(in_channels, out_channels * 3, bias=qkv_bias)
+        self.norm_factor = qk_scale if qk_scale else (
+            out_channels // num_heads) ** -0.5
+        self.qkv_transform = nn.Linear(
+            in_channels, out_channels * 3, bias=qkv_bias)
         self.projection = nn.Linear(out_channels, out_channels)
         self.attention_dropout = nn.Dropout(attn_drop_rate)
         self.projection_dropout = nn.Dropout(proj_drop_rate)
+        if cfg.TRANSFORMER.USE_FAST_ATTENTION and cfg.TRANSFORMER.ATTENTION_BY_CHANNEL == False:
+            self.attn_fn = FastAttention(
+                dim_heads=self.out_channels/num_heads, causal=False)
 
     def forward(self, x):
         N, L, _ = x.shape
-        x = self.qkv_transform(x).view(N, L, 3, self.num_heads, -1).permute(2, 0, 3, 1, 4)
+        if cfg.TRANSFORMER.ATTENTION_BY_CHANNEL:
+            x = self.qkv_transform(x).view(
+                N, L, 3, self.num_heads, -1).permute(2, 0, 3, 4, 1)
+        else:
+            x = self.qkv_transform(x).view(
+                N, L, 3, self.num_heads, -1).permute(2, 0, 3, 1, 4)
         query, key, value = x[0], x[1], x[2]
 
-        qk = query @ key.transpose(-1, -2) * self.norm_factor
-        qk = F.softmax(qk, dim=-1)
-        qk = self.attention_dropout(qk)
+        if cfg.TRANSFORMER.USE_FAST_ATTENTION and cfg.TRANSFORMER.ATTENTION_BY_CHANNEL == False:
+            out = self.attn_fn(query, key, value)
+        else:
+            qk = query @ key.transpose(-1, -2) * self.norm_factor
+            qk = F.softmax(qk, dim=-1)
+            qk = self.attention_dropout(qk)
+            out = qk @ value
 
-        out = qk @ value
-        out = out.transpose(1, 2).contiguous().view(N, L, self.out_channels)
+        if cfg.TRANSFORMER.ATTENTION_BY_CHANNEL:
+            out = out.permute(0, 3, 1, 2).contiguous().view(
+                N, L, self.out_channels)
+        else:
+            out = out.transpose(1, 2).contiguous().view(
+                N, L, self.out_channels)
         out = self.projection(out)
         out = self.projection_dropout(out)
-        
+
         if self.in_channels != self.out_channels:
             out = out + value.squeeze(1)
 
@@ -91,7 +110,7 @@ class TransformerLayer(nn.Module):
             out_channels = in_channels
         self.in_channels = in_channels
         self.out_channels = out_channels
-        
+
         self.norm1 = layernorm(in_channels)
         self.attn = MultiheadAttention(
             in_channels=in_channels,
@@ -101,7 +120,8 @@ class TransformerLayer(nn.Module):
             attn_drop_rate=attn_drop_rate,
             proj_drop_rate=drop_rate,
             qk_scale=qk_scale)
-        self.drop_path = DropPath(drop_path_rate) if drop_path_rate > 0 else nn.Identity()
+        self.drop_path = DropPath(
+            drop_path_rate) if drop_path_rate > 0 else nn.Identity()
         self.norm2 = layernorm(out_channels)
         self.mlp = MLP(
             in_channels=out_channels,
@@ -129,7 +149,16 @@ class PatchEmbedding(nn.Module):
         self.img_size = img_size
         self.patch_size = patch_size
         self.num_patches = (img_size // patch_size) ** 2
-        self.projection = nn.Conv2d(in_channels, out_channels, kernel_size=patch_size, stride=patch_size)
+        if cfg.TRANSFORMER.USE_SEPARABLE_CONV:
+            self.projection = nn.Sequential(
+                nn.Conv2d(in_channels, in_channels, kernel_size=patch_size,
+                          stride=patch_size, groups=in_channels),
+                nn.BatchNorm2d(in_channels),
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1),
+                nn.BatchNorm2d(out_channels))
+        else:
+            self.projection = nn.Conv2d(
+                in_channels, out_channels, kernel_size=patch_size, stride=patch_size)
 
     def forward(self, x):
         _, _, H, W = x.shape
