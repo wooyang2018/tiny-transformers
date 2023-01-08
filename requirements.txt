@@ -16,3 +16,5 @@ einops
 scipy
 tensorboard
 timm
+performer-pytorch
+fvcore

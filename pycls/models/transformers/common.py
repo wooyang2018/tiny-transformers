@@ -35,7 +35,7 @@ class MultiheadAttention(nn.Module):
         self.projection_dropout = nn.Dropout(proj_drop_rate)
         if cfg.TRANSFORMER.USE_FAST_ATTENTION and cfg.TRANSFORMER.ATTENTION_BY_CHANNEL == False:
             self.attn_fn = FastAttention(
-                dim_heads=self.out_channels/num_heads, causal=False)
+                dim_heads=self.out_channels//num_heads, causal=False)
 
     def forward(self, x):
         N, L, _ = x.shape
