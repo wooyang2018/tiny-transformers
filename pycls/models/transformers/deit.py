@@ -23,13 +23,16 @@ class DeiT(BaseTransformerModel):
         super(DeiT, self).__init__()
         self.cls_token = nn.Parameter(torch.zeros(1, 1, self.hidden_dim))
 
-        self.patch_embed = PatchEmbedding(img_size=self.img_size, patch_size=self.patch_size, in_channels=self.in_channels, out_channels=self.hidden_dim)
+        self.patch_embed = PatchEmbedding(
+            img_size=self.img_size, patch_size=self.patch_size, in_channels=self.in_channels, out_channels=self.hidden_dim)
         self.num_patches = self.patch_embed.num_patches
         self.num_tokens = 1 + cfg.DISTILLATION.ENABLE_LOGIT
-        self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches + self.num_tokens, self.hidden_dim))
+        self.pos_embed = nn.Parameter(torch.zeros(
+            1, self.num_patches + self.num_tokens, self.hidden_dim))
         self.pe_dropout = nn.Dropout(p=self.drop_rate)
 
-        dpr = [x.item() for x in torch.linspace(0, self.drop_path_rate, self.depth)]  # stochastic depth decay rule
+        dpr = [x.item() for x in torch.linspace(0, self.drop_path_rate,
+                                                self.depth)]  # stochastic depth decay rule
         self.layers = nn.ModuleList([TransformerLayer(
             in_channels=self.hidden_dim,
             num_heads=self.num_heads,
@@ -54,7 +57,8 @@ class DeiT(BaseTransformerModel):
         self.distill_token = None
         self.distill_head = None
         if cfg.DISTILLATION.ENABLE_LOGIT:
-            self.distill_token = nn.Parameter(torch.zeros(1, 1, self.hidden_dim))
+            self.distill_token = nn.Parameter(
+                torch.zeros(1, 1, self.hidden_dim))
             self.distill_head = nn.Linear(self.hidden_dim, self.num_classes)
             nn.init.zeros_(self.distill_head.weight)
             nn.init.constant_(self.distill_head.bias, 0)
@@ -62,7 +66,8 @@ class DeiT(BaseTransformerModel):
 
     def _feature_hook(self, module, inputs, outputs):
         feat_size = int(self.num_patches ** 0.5)
-        x = outputs[:, self.num_tokens:].view(outputs.size(0), feat_size, feat_size, self.hidden_dim)
+        x = outputs[:, self.num_tokens:].view(
+            outputs.size(0), feat_size, feat_size, self.hidden_dim)
         x = x.permute(0, 3, 1, 2).contiguous()
         self.features.append(x)
 
@@ -80,9 +85,10 @@ class DeiT(BaseTransformerModel):
         if self.num_tokens == 1:
             x = torch.cat([self.cls_token.repeat(x.size(0), 1, 1), x], dim=1)
         else:
-            x = torch.cat([self.cls_token.repeat(x.size(0), 1, 1), self.distill_token.repeat(x.size(0), 1, 1), x], dim=1)
+            x = torch.cat([self.cls_token.repeat(x.size(0), 1, 1),
+                          self.distill_token.repeat(x.size(0), 1, 1), x], dim=1)
         x = self.pe_dropout(x + self.pos_embed)
-        
+
         for layer in self.layers:
             x = layer(x)
 

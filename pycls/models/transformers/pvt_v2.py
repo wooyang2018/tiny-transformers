@@ -78,7 +78,8 @@ class Attention(nn.Module):
         self.sr_ratio = sr_ratio
         if not linear:
             if sr_ratio > 1:
-                self.sr = nn.Conv2d(dim, dim, kernel_size=sr_ratio, stride=sr_ratio)
+                self.sr = nn.Conv2d(
+                    dim, dim, kernel_size=sr_ratio, stride=sr_ratio)
                 self.norm = layernorm(dim)
         else:
             self.pool = nn.AdaptiveAvgPool2d(7)
@@ -104,22 +105,26 @@ class Attention(nn.Module):
 
     def forward(self, x, H, W):
         B, N, C = x.shape
-        q = self.q(x).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
+        q = self.q(x).reshape(B, N, self.num_heads, C //
+                              self.num_heads).permute(0, 2, 1, 3)
 
         if not self.linear:
             if self.sr_ratio > 1:
                 x_ = x.permute(0, 2, 1).reshape(B, C, H, W)
                 x_ = self.sr(x_).reshape(B, C, -1).permute(0, 2, 1)
                 x_ = self.norm(x_)
-                kv = self.kv(x_).reshape(B, -1, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+                kv = self.kv(x_).reshape(B, -1, 2, self.num_heads,
+                                         C // self.num_heads).permute(2, 0, 3, 1, 4)
             else:
-                kv = self.kv(x).reshape(B, -1, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+                kv = self.kv(x).reshape(B, -1, 2, self.num_heads,
+                                        C // self.num_heads).permute(2, 0, 3, 1, 4)
         else:
             x_ = x.permute(0, 2, 1).reshape(B, C, H, W)
             x_ = self.sr(self.pool(x_)).reshape(B, C, -1).permute(0, 2, 1)
             x_ = self.norm(x_)
             x_ = self.act(x_)
-            kv = self.kv(x_).reshape(B, -1, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+            kv = self.kv(x_).reshape(B, -1, 2, self.num_heads,
+                                     C // self.num_heads).permute(2, 0, 3, 1, 4)
         k, v = kv[0], kv[1]
 
         attn = (q @ k.transpose(-2, -1)) * self.scale
@@ -143,10 +148,12 @@ class Block(nn.Module):
             dim,
             num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale,
             attn_drop=attn_drop, proj_drop=drop, sr_ratio=sr_ratio, linear=linear)
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.drop_path = DropPath(
+            drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
-        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop, linear=linear)
+        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim,
+                       act_layer=act_layer, drop=drop, linear=linear)
 
         self.apply(self._init_weights)
 
@@ -178,12 +185,12 @@ class OverlapPatchEmbed(nn.Module):
 
     def __init__(self, img_size=224, patch_size=7, stride=4, in_chans=3, embed_dim=768):
         super().__init__()
-        
+
         img_size = to_2tuple(img_size)
         patch_size = to_2tuple(patch_size)
-        
+
         assert max(patch_size) > stride, "Set larger patch_size than stride"
-        
+
         self.img_size = img_size
         self.patch_size = patch_size
         self.H, self.W = img_size[0] // stride, img_size[1] // stride
@@ -226,7 +233,8 @@ class PVTv2(BaseTransformerModel):
         self.sr_ratio = cfg.PVT.SR_RATIO
         self.num_stages = len(self.hidden_dim)
 
-        dpr = [x.item() for x in torch.linspace(0, self.drop_path_rate, sum(self.depth))]  # stochastic depth decay rule
+        dpr = [x.item() for x in torch.linspace(0, self.drop_path_rate,
+                                                sum(self.depth))]  # stochastic depth decay rule
         cur = 0
 
         for i in range(self.num_stages):
@@ -238,7 +246,8 @@ class PVTv2(BaseTransformerModel):
 
             block = nn.ModuleList([Block(
                 dim=self.hidden_dim[i], num_heads=self.num_heads[i], mlp_ratio=self.mlp_ratio[i], qkv_bias=True, qk_scale=None,
-                drop=self.drop_rate, attn_drop=self.attn_drop_rate, drop_path=dpr[cur + j], norm_layer=layernorm,
+                drop=self.drop_rate, attn_drop=self.attn_drop_rate, drop_path=dpr[
+                    cur + j], norm_layer=layernorm,
                 sr_ratio=self.sr_ratio[i], linear=False)
                 for j in range(self.depth[i])])
             norm = layernorm(self.hidden_dim[i])
@@ -248,7 +257,8 @@ class PVTv2(BaseTransformerModel):
             setattr(self, f"block{i + 1}", block)
             setattr(self, f"norm{i + 1}", norm)
 
-        layers = [[m for m in getattr(self, f'block{i + 1}')] for i in range(self.num_stages)]
+        layers = [
+            [m for m in getattr(self, f'block{i + 1}')] for i in range(self.num_stages)]
         layers = sum(layers, [])
         self.initialize_hooks(layers)
 

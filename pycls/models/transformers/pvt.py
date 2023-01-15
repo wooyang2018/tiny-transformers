@@ -53,20 +53,24 @@ class Attention(nn.Module):
 
         self.sr_ratio = sr_ratio
         if sr_ratio > 1:
-            self.sr = nn.Conv2d(dim, dim, kernel_size=sr_ratio, stride=sr_ratio)
+            self.sr = nn.Conv2d(
+                dim, dim, kernel_size=sr_ratio, stride=sr_ratio)
             self.norm = layernorm(dim)
 
     def forward(self, x, H, W):
         B, N, C = x.shape
-        q = self.q(x).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
+        q = self.q(x).reshape(B, N, self.num_heads, C //
+                              self.num_heads).permute(0, 2, 1, 3)
 
         if self.sr_ratio > 1:
             x_ = x.permute(0, 2, 1).reshape(B, C, H, W)
             x_ = self.sr(x_).reshape(B, C, -1).permute(0, 2, 1)
             x_ = self.norm(x_)
-            kv = self.kv(x_).reshape(B, -1, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+            kv = self.kv(x_).reshape(B, -1, 2, self.num_heads,
+                                     C // self.num_heads).permute(2, 0, 3, 1, 4)
         else:
-            kv = self.kv(x).reshape(B, -1, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+            kv = self.kv(x).reshape(B, -1, 2, self.num_heads, C //
+                                    self.num_heads).permute(2, 0, 3, 1, 4)
         k, v = kv[0], kv[1]
 
         attn = (q @ k.transpose(-2, -1)) * self.scale
@@ -90,10 +94,12 @@ class Block(nn.Module):
             dim,
             num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale,
             attn_drop=attn_drop, proj_drop=drop, sr_ratio=sr_ratio)
-        self.drop_path_rate = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.drop_path_rate = DropPath(
+            drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
-        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
+        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim,
+                       act_layer=act_layer, drop=drop)
 
     def forward(self, x, H, W):
         x = x + self.drop_path_rate(self.attn(self.norm1(x), H, W))
@@ -113,7 +119,8 @@ class PatchEmbed(nn.Module):
         self.patch_size = patch_size
         self.H, self.W = img_size[0] // patch_size[0], img_size[1] // patch_size[1]
         self.num_patches = self.H * self.W
-        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
+        self.proj = nn.Conv2d(in_chans, embed_dim,
+                              kernel_size=patch_size, stride=patch_size)
         self.norm = layernorm(embed_dim)
 
     def forward(self, x):
@@ -134,7 +141,8 @@ class PVT(BaseTransformerModel):
         self.sr_ratio = cfg.PVT.SR_RATIO
         self.num_stages = len(self.hidden_dim)
 
-        dpr = [x.item() for x in torch.linspace(0, self.drop_path_rate, sum(self.depth))]  # stochastic depth decay rule
+        dpr = [x.item() for x in torch.linspace(0, self.drop_path_rate,
+                                                sum(self.depth))]  # stochastic depth decay rule
         cur = 0
 
         for i in range(self.num_stages):
@@ -142,8 +150,10 @@ class PVT(BaseTransformerModel):
                                      patch_size=self.patch_size[i],
                                      in_chans=self.in_channels if i == 0 else self.hidden_dim[i - 1],
                                      embed_dim=self.hidden_dim[i])
-            num_patches = patch_embed.num_patches if i != self.num_stages - 1 else patch_embed.num_patches + 1
-            pos_embed = nn.Parameter(torch.zeros(1, num_patches, self.hidden_dim[i]))
+            num_patches = patch_embed.num_patches if i != self.num_stages - \
+                1 else patch_embed.num_patches + 1
+            pos_embed = nn.Parameter(torch.zeros(
+                1, num_patches, self.hidden_dim[i]))
             pos_drop = nn.Dropout(p=self.drop_rate)
 
             block = nn.ModuleList([Block(
@@ -158,7 +168,8 @@ class PVT(BaseTransformerModel):
             setattr(self, f"pos_drop{i + 1}", pos_drop)
             setattr(self, f"block{i + 1}", block)
 
-        layers = [[m for m in getattr(self, f'block{i + 1}')] for i in range(self.num_stages)]
+        layers = [
+            [m for m in getattr(self, f'block{i + 1}')] for i in range(self.num_stages)]
         layers = sum(layers, [])
         self.initialize_hooks(layers)
 
@@ -200,7 +211,8 @@ class PVT(BaseTransformerModel):
             return pos_embed
         else:
             return F.interpolate(
-                pos_embed.reshape(1, patch_embed.H, patch_embed.W, -1).permute(0, 3, 1, 2),
+                pos_embed.reshape(1, patch_embed.H,
+                                  patch_embed.W, -1).permute(0, 3, 1, 2),
                 size=(H, W), mode="bilinear", align_corners=False).reshape(1, -1, H * W).permute(0, 2, 1)
 
     def forward_features(self, x):
@@ -216,7 +228,8 @@ class PVT(BaseTransformerModel):
             if i == self.num_stages - 1:
                 cls_tokens = self.cls_token.expand(B, -1, -1)
                 x = torch.cat((cls_tokens, x), dim=1)
-                pos_embed_ = self._get_pos_embed(pos_embed[:, 1:], patch_embed, H, W)
+                pos_embed_ = self._get_pos_embed(
+                    pos_embed[:, 1:], patch_embed, H, W)
                 pos_embed = torch.cat((pos_embed[:, 0:1], pos_embed_), dim=1)
             else:
                 pos_embed = self._get_pos_embed(pos_embed, patch_embed, H, W)

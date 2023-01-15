@@ -38,7 +38,8 @@ class BaseTransformerModel(nn.Module, metaclass=ABCMeta):
         elif isinstance(self.hidden_dim, (list, tuple)):
             assert isinstance(self.depth, (list, tuple))
             assert len(self.hidden_dim) == len(self.depth)
-            self.feature_dims = sum([[self.hidden_dim[i]] * d for i, d in enumerate(self.depth)], [])
+            self.feature_dims = sum(
+                [[self.hidden_dim[i]] * d for i, d in enumerate(self.depth)], [])
         else:
             raise ValueError
         self.features = list()
@@ -50,7 +51,8 @@ class BaseTransformerModel(nn.Module, metaclass=ABCMeta):
         """
         for layer in layers:
             layer.register_forward_hook(self._feature_hook)
-        self.register_forward_pre_hook(lambda module, inp: self.features.clear())
+        self.register_forward_pre_hook(
+            lambda module, inp: self.features.clear())
 
     @abstractmethod
     def _feature_hook(self, module, inputs, outputs):

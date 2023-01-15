@@ -354,7 +354,8 @@ class VisionTransformer(nn.Module):
                  init='trunc_norm',
                  **kwargs):
         super().__init__()
-        self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
+        # num_features for consistency with other models
+        self.num_features = self.embed_dim = embed_dim
 
         self.rearrage = None
 
@@ -377,7 +378,8 @@ class VisionTransformer(nn.Module):
             self.cls_token = None
 
         self.pos_drop = nn.Dropout(p=drop_rate)
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
+        # stochastic depth decay rule
+        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]
 
         blocks = []
         for j in range(depth):
@@ -505,7 +507,8 @@ class CvT(BaseTransformerModel):
         self.norm = norm_layer(dim_embed)
         self.has_cls_token = self.with_cls_token[-1]
 
-        self.head = nn.Linear(dim_embed, self.num_classes) if self.num_classes > 0 else nn.Identity()
+        self.head = nn.Linear(
+            dim_embed, self.num_classes) if self.num_classes > 0 else nn.Identity()
         trunc_normal_(self.head.weight, std=0.02)
 
     def _feature_hook(self, module, inputs, outputs):

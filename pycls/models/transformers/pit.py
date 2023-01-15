@@ -97,7 +97,8 @@ class PiT(BaseTransformerModel):
         self.stride = cfg.PIT.STRIDE
         total_block = sum(self.depth)
         block_idx = 0
-        embed_size = math.floor((self.img_size - self.patch_size) / self.stride + 1)
+        embed_size = math.floor(
+            (self.img_size - self.patch_size) / self.stride + 1)
 
         self.pos_embed = nn.Parameter(
             torch.randn(1, self.hidden_dim[0], embed_size, embed_size),

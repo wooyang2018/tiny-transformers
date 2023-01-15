@@ -59,7 +59,8 @@ def conv2d_cx(cx, w_in, w_out, k, *, stride=1, groups=1, bias=False):
     assert k % 2 == 1, "Only odd size kernels supported to avoid padding issues."
     h, w, flops, params, acts = cx["h"], cx["w"], cx["flops"], cx["params"], cx["acts"]
     h, w = (h - 1) // stride + 1, (w - 1) // stride + 1
-    flops += k * k * w_in * w_out * h * w // groups + (w_out * h * w if bias else 0)
+    flops += k * k * w_in * w_out * h * \
+        w // groups + (w_out * h * w if bias else 0)
     params += k * k * w_in * w_out // groups + (w_out if bias else 0)
     acts += w_out * h * w
     return {"h": h, "w": w, "flops": flops, "params": params, "acts": acts}
@@ -92,7 +93,8 @@ def layernorm_cx(cx, w_in):
 
 def linear_cx(cx, w_in, w_out, *, bias=False, num_locations=1):
     h, w, flops, params, acts = cx["h"], cx["w"], cx["flops"], cx["params"], cx["acts"]
-    flops += w_in * w_out * num_locations + (w_out * num_locations if bias else 0)
+    flops += w_in * w_out * num_locations + \
+        (w_out * num_locations if bias else 0)
     params += w_in * w_out + (w_out if bias else 0)
     acts += w_out * num_locations
     return {"h": h, "w": w, "flops": flops, "params": params, "acts": acts}
@@ -151,7 +153,8 @@ def init_weights(m):
         m.weight.data.normal_(mean=0.0, std=np.sqrt(2.0 / fan_out))
     elif isinstance(m, nn.BatchNorm2d):
         zero_init_gamma = cfg.CNN.ZERO_INIT_FINAL_BN_GAMMA
-        zero_init_gamma = hasattr(m, "final_bn") and m.final_bn and zero_init_gamma
+        zero_init_gamma = hasattr(
+            m, "final_bn") and m.final_bn and zero_init_gamma
         m.weight.data.fill_(0.0 if zero_init_gamma else 1.0)
         m.bias.data.zero_()
     elif isinstance(m, nn.Linear):

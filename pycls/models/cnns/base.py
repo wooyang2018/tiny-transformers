@@ -29,7 +29,8 @@ class BaseConvModel(nn.Module, metaclass=ABCMeta):
         for layer in layers:
             layer.register_forward_hook(self._feature_hook)
         self.feature_dims = feature_dims
-        self.register_forward_pre_hook(lambda module, inp: self.features.clear())
+        self.register_forward_pre_hook(
+            lambda module, inp: self.features.clear())
 
     @abstractmethod
     def _feature_hook(self, module, inputs, outputs):

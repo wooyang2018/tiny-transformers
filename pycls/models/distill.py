@@ -19,7 +19,8 @@ def similarity_transform(feat):
     return F.normalize(gram)
 
 
-_TRANS_FUNC = {"attention": attention_transform, "similarity": similarity_transform, "linear": lambda x : x}
+_TRANS_FUNC = {"attention": attention_transform,
+               "similarity": similarity_transform, "linear": lambda x: x}
 
 
 def inter_distill_loss(feat_t, feat_s, transform_type):
@@ -70,17 +71,19 @@ class DistillationWrapper(nn.Module):
         teacher_weights = cfg.DISTILLATION.TEACHER_WEIGHTS
         if teacher_weights:
             checkpoint = torch.load(teacher_weights)["model_state"]
-            logger.info("Loaded initial weights of teacher model from: {}".format(teacher_weights))
+            logger.info(
+                "Loaded initial weights of teacher model from: {}".format(teacher_weights))
             self.teacher_model.load_state_dict(checkpoint)
 
         if self.inter_transform_type == 'linear':
             self.feature_transforms = nn.ModuleList()
             for i, j in zip(self.student_idx, self.teacher_idx):
-                self.feature_transforms.append(nn.Conv2d(self.student_model.feature_dims[i], self.teacher_model.feature_dims[j], 1))
+                self.feature_transforms.append(nn.Conv2d(
+                    self.student_model.feature_dims[i], self.teacher_model.feature_dims[j], 1))
 
     def load_state_dict(self, state_dict, strict=True):
         return self.student_model.load_state_dict(state_dict, strict)
-    
+
     def state_dict(self, destination=None, prefix='', keep_vars=False):
         return self.student_model.state_dict(destination, prefix, keep_vars)
 
@@ -103,7 +106,8 @@ class DistillationWrapper(nn.Module):
             logits_t = None
             feats_t = offline_feats
         else:
-            x = F.interpolate(x, size=(self.teacher_img_size, self.teacher_img_size), mode='bilinear', align_corners=False)
+            x = F.interpolate(x, size=(
+                self.teacher_img_size, self.teacher_img_size), mode='bilinear', align_corners=False)
             with torch.no_grad():
                 logits_t = self.teacher_model(x)
                 feats_t = self.teacher_model.features
@@ -117,11 +121,17 @@ class DistillationWrapper(nn.Module):
                 if self.inter_transform_type == 'linear':
                     feat_s = self.feature_transforms[i](feat_s)
 
-                dsize = (max(feat_t.size(-2), feat_s.size(-2)), max(feat_t.size(-1), feat_s.size(-1)))
-                feat_t = F.interpolate(feat_t, dsize, mode='bilinear', align_corners=False)
-                feat_s = F.interpolate(feat_s, dsize, mode='bilinear', align_corners=False)
-                loss_inter = loss_inter + inter_distill_loss(feat_t, feat_s, self.inter_transform_type)
+                dsize = (max(feat_t.size(-2), feat_s.size(-2)),
+                         max(feat_t.size(-1), feat_s.size(-1)))
+                feat_t = F.interpolate(
+                    feat_t, dsize, mode='bilinear', align_corners=False)
+                feat_s = F.interpolate(
+                    feat_s, dsize, mode='bilinear', align_corners=False)
+                loss_inter = loss_inter + \
+                    inter_distill_loss(
+                        feat_t, feat_s, self.inter_transform_type)
 
-        loss_logit = logit_distill_loss(logits_t, logits_s, self.logit_loss_type) if self.enable_logit else x.new_tensor(0.0)
+        loss_logit = logit_distill_loss(
+            logits_t, logits_s, self.logit_loss_type) if self.enable_logit else x.new_tensor(0.0)
 
         return loss_inter, loss_logit

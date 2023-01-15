@@ -119,7 +119,8 @@ class ResStage(Module):
             b_stride = stride if i == 0 else 1
             b_w_in = w_in if i == 0 else w_out
             trans_fun = get_trans_fun(cfg.RESNET.TRANS_FUN)
-            res_block = ResBlock(b_w_in, w_out, b_stride, trans_fun, w_b, groups)
+            res_block = ResBlock(b_w_in, w_out, b_stride,
+                                 trans_fun, w_b, groups)
             self.add_module("b{}".format(i + 1), res_block)
         self.out_channels = w_out
 
@@ -193,8 +194,10 @@ class ResNet(BaseConvModel):
         if cfg.RESNET.TRANS_FUN == 'bottleneck_transform':
             self.s1 = ResStage(64, 256, stride=1, d=d1, w_b=w_b, groups=g)
             self.s2 = ResStage(256, 512, stride=2, d=d2, w_b=w_b * 2, groups=g)
-            self.s3 = ResStage(512, 1024, stride=2, d=d3, w_b=w_b * 4, groups=g)
-            self.s4 = ResStage(1024, 2048, stride=2, d=d4, w_b=w_b * 8, groups=g)
+            self.s3 = ResStage(512, 1024, stride=2, d=d3,
+                               w_b=w_b * 4, groups=g)
+            self.s4 = ResStage(1024, 2048, stride=2, d=d4,
+                               w_b=w_b * 8, groups=g)
             self.head = ResHead(2048, self.num_classes)
         else:
             self.s1 = ResStage(64, 64, stride=1, d=d1)
